@@ -1,0 +1,17 @@
+@startuml
+participant Cloud
+database DiagnosticsStorage
+
+loop : 10 minutes
+    DiagnosticsModule -> edgeHub: Scrape Metrics
+    DiagnosticsModule -> edgeAgent: Scrape Metrics
+    edgeHub --> DiagnosticsModule: Metrics Response
+    edgeAgent --> DiagnosticsModule: Metrics Response
+    DiagnosticsModule -> DiagnosticsStorage: Mertics
+end
+|||
+group 1 per day
+    DiagnosticsStorage -> DiagnosticsModule: Metrics
+    DiagnosticsModule -> Cloud: Upload
+end
+@enduml
