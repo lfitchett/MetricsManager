@@ -21,7 +21,7 @@ namespace MetricsCollector
             AssemblyLoadContext.Default.Unloading += ctx => cts.Cancel();
             Console.CancelKeyPress += (sender, cpe) => cts.Cancel();
 
-            Init().ContinueWith(async worker => (await worker).Start(cts.Token)).Wait();
+            //Init().ContinueWith(async worker => (await worker).Start(cts.Token)).Wait();
         }
 
         /// <summary>
@@ -74,7 +74,7 @@ namespace MetricsCollector
             var scrapingInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs);
             var uploadInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs * 2);
 
-            return new Worker(scraper, storage, metricsSync, scrapingInterval, uploadInterval);
+            return new Worker(scraper, storage, metricsSync);
         }
 
         private static async Task<Configuration> GetConfiguration(ModuleClient ioTHubModuleClient)

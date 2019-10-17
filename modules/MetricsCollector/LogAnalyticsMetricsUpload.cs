@@ -1,7 +1,9 @@
 ﻿namespace MetricsCollector
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
+    using System.Text;
     using System.Threading.Tasks;
 
     class LogAnalyticsMetricsUpload : IMetricsUpload
@@ -17,11 +19,11 @@
             this.logAnalytics = logAnalytics;
         }
 
-        public async Task Upload(DateTime scrapedTime, string prometheusMetrics)
+        public async Task Upload(IEnumerable<Metric> metrics)
         {
             try
             {
-                byte[] message = messageFormatter.BuildJSON(scrapedTime, prometheusMetrics);
+                byte[] message = Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(metrics));
                 await logAnalytics.Post(message);
             }
             catch (Exception e)

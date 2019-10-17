@@ -19,17 +19,18 @@
             this.moduleClient = moduleClient;
         }
 
-        public async Task Upload(DateTime scrapedTime, string prometheusMetrics)
+        public async Task Upload(IEnumerable<Metric> metrics)
         {
-            try
-            {
-                IList<Message> messages = messageFormatter.Build(scrapedTime, prometheusMetrics);
-                await moduleClient.SendEventBatchAsync(messages);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Error uploading metrics - {e}");
-            }
+            await Task.CompletedTask;
+            //try
+            //{
+            //    IList<Message> messages = messageFormatter.Build(scrapedTime, prometheusMetrics);
+            //    await moduleClient.SendEventBatchAsync(messages);
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine($"Error uploading metrics - {e}");
+            //}
         }
     }
 }

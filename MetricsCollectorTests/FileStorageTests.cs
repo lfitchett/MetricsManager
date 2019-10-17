@@ -52,9 +52,9 @@ namespace MetricsCollectorTests
             string testData = string.Join(", ", Enumerable.Range(0, 10));
             storage.AddScrapeResult("test_module", testData);
 
-            IDictionary<DateTime, Lazy<string>> actual = storage.GetData("test_module");
+            IDictionary<DateTime, Func<string>> actual = storage.GetData("test_module");
             Assert.Single(actual);
-            Assert.Equal(testData, actual.Single().Value.Value);
+            Assert.Equal(testData, actual.Single().Value());
         }
 
         [Fact]
@@ -64,9 +64,9 @@ namespace MetricsCollectorTests
 
             storage.AddScrapeResult("test_module", "data1");
 
-            IDictionary<DateTime, Lazy<string>> actual = storage.GetData("test_module");
+            IDictionary<DateTime, Func<string>> actual = storage.GetData("test_module");
             Assert.Single(actual);
-            Assert.Equal("data1", actual.Single().Value.Value);
+            Assert.Equal("data1", actual.Single().Value());
 
             DateTime break1 = fakeTime.AddMinutes(5);
             fakeTime = fakeTime.AddMinutes(10);
@@ -76,7 +76,7 @@ namespace MetricsCollectorTests
             Assert.Equal(2, actual.Count);
             actual = storage.GetData("test_module", break1);
             Assert.Single(actual);
-            Assert.Equal("data2", actual.Single().Value.Value);
+            Assert.Equal("data2", actual.Single().Value());
 
             DateTime break2 = fakeTime.AddMinutes(5);
             fakeTime = fakeTime.AddMinutes(10);
@@ -86,7 +86,7 @@ namespace MetricsCollectorTests
             Assert.Equal(3, actual.Count);
             actual = storage.GetData("test_module", break1, break2);
             Assert.Single(actual);
-            Assert.Equal("data2", actual.Single().Value.Value);
+            Assert.Equal("data2", actual.Single().Value());
         }
 
         [Fact]
@@ -106,7 +106,7 @@ namespace MetricsCollectorTests
             foreach (var d in testData)
             {
                 /* get all stored data and sort by timestamp (key) */
-                var actual = storage.GetData(d.Key).Select(x => x.Value.Value);
+                var actual = storage.GetData(d.Key).Select(x => x.Value());
                 Assert.Equal(d.Value.OrderBy(x => x), actual.OrderBy(x => x));
             }
         }
@@ -118,9 +118,9 @@ namespace MetricsCollectorTests
 
             storage.AddScrapeResult("test_module", "data1");
 
-            IDictionary<DateTime, Lazy<string>> actual = storage.GetData("test_module");
+            IDictionary<DateTime, Func<string>> actual = storage.GetData("test_module");
             Assert.Single(actual);
-            Assert.Equal("data1", actual.Single().Value.Value);
+            Assert.Equal("data1", actual.Single().Value());
 
             DateTime break1 = fakeTime.AddMinutes(5);
             fakeTime = fakeTime.AddMinutes(10);
@@ -145,7 +145,7 @@ namespace MetricsCollectorTests
             Assert.Equal(4, actual.Count);
             storage.RemoveOldEntries(break2);
             actual = storage.GetData("test_module");
-            Assert.Equal(new[] { "data3", "data4", "data5" }, actual.OrderBy(x => x.Key).Select(x => x.Value.Value));
+            Assert.Equal(new[] { "data3", "data4", "data5" }, actual.OrderBy(x => x.Key).Select(x => x.Value()));
 
             storage.RemoveOldEntries(DateTime.UtcNow);
             actual = storage.GetData("test_module");
