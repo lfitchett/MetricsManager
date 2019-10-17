@@ -62,7 +62,13 @@
             "restartPolicy": "always",
             "settings": {
               "image": "${MODULES.MetricsCollector}",
-              "createOptions": {}
+              "createOptions": {
+                "HostConfig": {
+                  "Binds": [
+                    "/shared/metrics:/data"
+                  ]
+                }
+              }
             },
             "env": {
               "AzMonWorkspaceId": {

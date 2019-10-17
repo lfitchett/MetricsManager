@@ -4,33 +4,29 @@
     using System.Collections.Generic;
     using System.Threading.Tasks;
 
-    class LogAnalyticsMetricsSync : IMetricsSync
+    class LogAnalyticsMetricsUpload : IMetricsUpload
     {
         readonly MessageFormatter messageFormatter;
         readonly Scraper scraper;
         readonly AzureLogAnalytics logAnalytics;
 
-        public LogAnalyticsMetricsSync(MessageFormatter messageFormatter, Scraper scraper, AzureLogAnalytics logAnalytics)
+        public LogAnalyticsMetricsUpload(MessageFormatter messageFormatter, Scraper scraper, AzureLogAnalytics logAnalytics)
         {
             this.messageFormatter = messageFormatter ?? throw new ArgumentNullException(nameof(messageFormatter));
             this.scraper = scraper ?? throw new ArgumentNullException(nameof(scraper));
             this.logAnalytics = logAnalytics;
         }
 
-        public async Task ScrapeAndSync()
+        public async Task Upload(DateTime scrapedTime, string prometheusMetrics)
         {
             try
             {
-                IEnumerable<string> scrapedMetrics = await this.scraper.Scrape();
-                foreach (var scrape in scrapedMetrics)
-                {
-                    logAnalytics.Post(this.messageFormatter.BuildJSON(scrape));
-                }
-                Console.WriteLine($"Sent metrics to LogAnalytics");
+                byte[] message = messageFormatter.BuildJSON(scrapedTime, prometheusMetrics);
+                await logAnalytics.Post(message);
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Error scraping and syncing metrics - {e}");
+                Console.WriteLine($"Error uploading metrics - {e}");
             }
         }
     }

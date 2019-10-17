@@ -5,7 +5,8 @@
     using System.Net;
     using System.Security.Cryptography;
     using System.Text;
-    
+    using System.Threading.Tasks;
+
     // Sample code from: 
     // https://dejanstojanovic.net/aspnet/2018/february/send-data-to-azure-log-analytics-from-c-code/
 
@@ -24,7 +25,7 @@
         public string ApiVersion { get; }
         public string LogType { get; }
 
-        public void Post(byte[] content)
+        public async Task Post(byte[] content)
         {
             string requestUriString = $"https://{WorkspaceId}.ods.opinsights.azure.com/api/logs?api-version={ApiVersion}";
             DateTime dateTime = DateTime.UtcNow;
@@ -41,14 +42,14 @@
                 requestStreamAsync.Write(content, 0, content.Length);
             }
 
-            using (HttpWebResponse responseAsync = (HttpWebResponse)request.GetResponse())
+            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
             {
 
-                Console.WriteLine(responseAsync.StatusDescription);
+                Console.WriteLine(response.StatusDescription);
 
                 // Get the stream containing content returned by the server.  
                 // The using block ensures the stream is automatically closed.
-                using (Stream dataStream = responseAsync.GetResponseStream())
+                using (Stream dataStream = response.GetResponseStream())
                 {
                     StreamReader reader = new StreamReader(dataStream);
                     string responseFromServer = reader.ReadToEnd();

@@ -7,22 +7,21 @@ namespace MetricsCollector
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Client;
     using Microsoft.Azure.Devices.Client.Transport.Mqtt;
+    using Microsoft.WindowsAzure.Storage.Auth;
     using Newtonsoft.Json;
 
     internal class Program
     {
         private static readonly Version ExpectedSchemaVersion = new Version("1.0");
-        private static Timer ScrapingTimer;
 
         private static void Main(string[] args)
         {
-            Init().Wait();
-
             // Wait until the app unloads or is cancelled
             var cts = new CancellationTokenSource();
             AssemblyLoadContext.Default.Unloading += ctx => cts.Cancel();
             Console.CancelKeyPress += (sender, cpe) => cts.Cancel();
-            WhenCancelled(cts.Token).Wait();
+
+            Init().ContinueWith(async worker => (await worker).Start(cts.Token)).Wait();
         }
 
         /// <summary>
@@ -39,7 +38,7 @@ namespace MetricsCollector
         ///     Initializes the ModuleClient and sets up the callback to receive
         ///     messages containing temperature information
         /// </summary>
-        private static async Task Init()
+        private static async Task<Worker> Init()
         {
             var mqttSetting = new MqttTransportSettings(TransportType.Mqtt_Tcp_Only);
             ITransportSettings[] settings = { mqttSetting };
@@ -57,8 +56,9 @@ namespace MetricsCollector
 
             var messageFormatter = new MessageFormatter(configuration.MetricsFormat, identifier);
             var scraper = new Scraper(configuration.Endpoints.Values.ToList());
+            FileStorage storage = new FileStorage(@"\data");
 
-            IMetricsSync metricsSync;
+            IMetricsUpload metricsSync;
             if (configuration.SyncTarget == SyncTarget.AzureLogAnalytics)
             {
                 string workspaceId = Environment.GetEnvironmentVariable("AzMonWorkspaceId") ??
@@ -73,28 +73,18 @@ namespace MetricsCollector
                     Environment.GetEnvironmentVariable("azMonCustomLogName") ??
                     "promMetrics";
 
-                metricsSync = new LogAnalyticsMetricsSync(messageFormatter, scraper, new AzureLogAnalytics(workspaceId, wKey, clName));
+                metricsSync = new LogAnalyticsMetricsUpload(messageFormatter, scraper, new AzureLogAnalytics(workspaceId, wKey, clName));
             }
             else
             {
-                metricsSync = new IoTHubMetricsSync(messageFormatter, scraper, ioTHubModuleClient);
+                metricsSync = new IoTHubMetricsUpload(messageFormatter, scraper, ioTHubModuleClient);
             }
-            
-            var scrapingInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs);
-            ScrapingTimer = new Timer(ScrapeAndSync, metricsSync, scrapingInterval, scrapingInterval);
-        }
 
-        private static async void ScrapeAndSync(object context)
-        {
-            try
-            {
-                var metricsSync = (IMetricsSync)context;
-                await metricsSync.ScrapeAndSync();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Error scraping and syncing metrics to IoTHub - {e}");
-            }
+
+            var scrapingInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs);
+            var uploadInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs * 2);
+
+            return new Worker(scraper, storage, metricsSync, scrapingInterval, uploadInterval);
         }
 
         private static async Task<Configuration> GetConfiguration(ModuleClient ioTHubModuleClient)

@@ -1,6 +1,7 @@
 namespace MetricsCollector
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
     using System.Net;
@@ -41,15 +42,15 @@ namespace MetricsCollector
             return endpointWithIp;
         }
 
-        public async Task<IEnumerable<string>> Scrape()
+        public async Task<IDictionary<string, string>> Scrape()
         {
-            var metrics = new List<string>();
+            var metrics = new Dictionary<string, string>();
             foreach (KeyValuePair<string, string> endpoint in this.endpoints)
             {
                 Console.WriteLine($"Scraping endpoint {endpoint.Key}");
                 string metricsData = await this.ScrapeEndpoint(endpoint.Value);
                 Console.WriteLine($"Got metrics from endpoint {endpoint}");
-                metrics.Add(metricsData);
+                metrics.Add(endpoint.Key, metricsData);
             }
             return metrics;
         }
