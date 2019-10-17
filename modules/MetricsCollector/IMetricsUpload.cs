@@ -1,10 +1,11 @@
 ﻿namespace MetricsCollector
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     public interface IMetricsUpload
     {
-        Task Upload(DateTime scrapedTime, string data);
+        Task Upload(IEnumerable<Metric> metrics);
     }
 }

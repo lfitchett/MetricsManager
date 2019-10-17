@@ -8,11 +8,11 @@
 
     public class IoTHubMetricsUpload : IMetricsUpload
     {
-        readonly MessageFormatter messageFormatter;
+        readonly MetricsParser messageFormatter;
         readonly Scraper scraper;
         readonly ModuleClient moduleClient;
 
-        public IoTHubMetricsUpload(MessageFormatter messageFormatter, Scraper scraper, ModuleClient moduleClient)
+        public IoTHubMetricsUpload(MetricsParser messageFormatter, Scraper scraper, ModuleClient moduleClient)
         {
             this.messageFormatter = messageFormatter ?? throw new ArgumentNullException(nameof(messageFormatter));
             this.scraper = scraper ?? throw new ArgumentNullException(nameof(scraper));

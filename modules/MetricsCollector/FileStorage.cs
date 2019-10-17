@@ -14,9 +14,9 @@ namespace MetricsCollector
     {
         void AddScrapeResult(string module, string data);
         IEnumerable<string> GetAllModules();
-        IDictionary<DateTime, Lazy<string>> GetData(string module);
-        IDictionary<DateTime, Lazy<string>> GetData(string module, DateTime start);
-        IDictionary<DateTime, Lazy<string>> GetData(string module, DateTime start, DateTime end);
+        IDictionary<DateTime, Func<string>> GetData(string module);
+        IDictionary<DateTime, Func<string>> GetData(string module, DateTime start);
+        IDictionary<DateTime, Func<string>> GetData(string module, DateTime start, DateTime end);
         void RemoveOldEntries(DateTime keepAfter);
     }
 
@@ -43,19 +43,19 @@ namespace MetricsCollector
             return Directory.GetDirectories(directory).Select(Path.GetFileName);
         }
 
-        public IDictionary<DateTime, Lazy<string>> GetData(string module)
+        public IDictionary<DateTime, Func<string>> GetData(string module)
         {
             return GetData(module, _ => true);
         }
-        public IDictionary<DateTime, Lazy<string>> GetData(string module, DateTime start)
+        public IDictionary<DateTime, Func<string>> GetData(string module, DateTime start)
         {
             return GetData(module, ticks => start.Ticks <= ticks);
         }
-        public IDictionary<DateTime, Lazy<string>> GetData(string module, DateTime start, DateTime end)
+        public IDictionary<DateTime, Func<string>> GetData(string module, DateTime start, DateTime end)
         {
             return GetData(module, ticks => start.Ticks <= ticks && ticks <= end.Ticks);
         }
-        private IDictionary<DateTime, Lazy<string>> GetData(string module, Func<long, bool> inTimeRange)
+        private IDictionary<DateTime, Func<string>> GetData(string module, Func<long, bool> inTimeRange)
         {
             return Directory.GetFiles(Path.Combine(directory, module))
                 .Select(Path.GetFileName)
@@ -63,14 +63,14 @@ namespace MetricsCollector
                 .Where(inTimeRange)
                 .ToDictionary(
                     ticks => new DateTime(ticks),
-                    ticks => new Lazy<string>(() =>
+                    ticks => (Func<string>)(() =>
                     {
                         string file = Path.Combine(directory, module, ticks.ToString());
                         if (File.Exists(file))
                         {
                             return File.ReadAllText(file);
                         }
-                        return "";
+                        return "[]";
                     })
                 );
         }

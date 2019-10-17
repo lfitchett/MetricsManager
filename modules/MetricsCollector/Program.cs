@@ -44,7 +44,7 @@ namespace MetricsCollector
             var identifier = Environment.GetEnvironmentVariable("MessageIdentifier") ?? "IoTEdgeMetrics";
             Console.WriteLine($"Using message identifier {identifier}");
 
-            var messageFormatter = new MessageFormatter(configuration.MetricsFormat, identifier);
+            var messageFormatter = new MetricsParser();
             var scraper = new Scraper(configuration.Endpoints.Values.ToList());
             var storage = new FileStorage(@"\data");
 

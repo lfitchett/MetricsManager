@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -13,54 +14,82 @@ namespace MetricsCollector
         private readonly IScraper scraper;
         private readonly IFileStorage storage;
         private readonly IMetricsUpload uploader;
-        private readonly TimeSpan scrapingInterval;
-        private readonly TimeSpan uploadInterval;
+        private readonly MetricsParser metricsParser = new MetricsParser();
 
         private DateTime lastUploadTime = DateTime.MinValue;
+        private Dictionary<int, Metric> metrics = new Dictionary<int, Metric>();
 
-        public Worker(IScraper scraper, IFileStorage storage, IMetricsUpload uploader, TimeSpan scrapingInterval, TimeSpan uploadInterval)
+        public Worker(IScraper scraper, IFileStorage storage, IMetricsUpload uploader)
         {
             this.scraper = scraper;
             this.storage = storage;
             this.uploader = uploader;
-            this.scrapingInterval = scrapingInterval;
-            this.uploadInterval = uploadInterval;
         }
 
-        public async Task Start(CancellationToken cancellationToken)
+        public async Task Start(TimeSpan scrapingInterval, TimeSpan uploadInterval, CancellationToken cancellationToken)
         {
-            Timer scrapingTimer = new Timer(async _ =>
-            {
-                Console.WriteLine($"\n\n\nScraping Metrics");
-
-                foreach (var moduleResult in await scraper.Scrape())
-                {
-                    Console.WriteLine($"Storing metrics for {moduleResult.Key}:\n{moduleResult.Value}");
-                    storage.AddScrapeResult(moduleResult.Key, moduleResult.Value);
-                }
-            }, null, scrapingInterval, scrapingInterval);
-
-            Timer uploadTimer = new Timer(async _ =>
-            {
-                Console.WriteLine($"\n\n\nUploading Metrics");
-
-                foreach (string module in storage.GetAllModules())
-                {
-                    foreach (KeyValuePair<DateTime, Lazy<string>> data in storage.GetData(module, lastUploadTime))
-                    {
-                        await uploader.Upload(data.Key, data.Value.Value);
-                    }
-
-                }
-
-                lastUploadTime = systemTime.UtcNow;
-            }, null, uploadInterval, uploadInterval);
-
+            Timer scrapingTimer = new Timer(async _ => await Scrape(), null, scrapingInterval, scrapingInterval);
+            Timer uploadTimer = new Timer(async _ => await Upload(), null, uploadInterval, uploadInterval);
 
             await Task.Delay(-1, cancellationToken).ContinueWith(_ => { }, TaskContinuationOptions.OnlyOnCanceled);
 
             scrapingTimer.Dispose();
             uploadTimer.Dispose();
+        }
+
+        private async Task Scrape()
+        {
+            Console.WriteLine($"\n\n\nScraping Metrics");
+
+            foreach (var moduleResult in await scraper.Scrape())
+            {
+                Console.WriteLine($"Storing metrics for {moduleResult.Key}:\n{moduleResult.Value}");
+                var scrapedMetrics = metricsParser.ParseMetrics(systemTime.UtcNow, moduleResult.Value);
+
+                List<Metric> metricsToPersist = new List<Metric>();
+                foreach (Metric scrapedMetric in scrapedMetrics)
+                {
+                    if (metrics.TryGetValue(scrapedMetric.GetValuelessHash(), out Metric oldMetric))
+                    {
+                        if (oldMetric.Value.Equals(scrapedMetric.Value))
+                        {
+                            continue;
+                        }
+                        metricsToPersist.Add(oldMetric);
+                    }
+                    metrics.Add(scrapedMetric.GetValuelessHash(), scrapedMetric);
+                }
+
+                storage.AddScrapeResult(moduleResult.Key, Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
+            }
+        }
+
+        private async Task Upload()
+        {
+            Console.WriteLine($"\n\n\nUploading Metrics");
+            await uploader.Upload(GetMetricsToUpload());
+            lastUploadTime = systemTime.UtcNow;
+        }
+
+        private IEnumerable<Metric> GetMetricsToUpload()
+        {
+            foreach (string module in storage.GetAllModules())
+            {
+                foreach (KeyValuePair<DateTime, Func<string>> data in storage.GetData(module, lastUploadTime))
+                {
+                    var fileMetrics = Newtonsoft.Json.JsonConvert.DeserializeObject<Metric[]>(data.Value());
+                    foreach (Metric metric in fileMetrics)
+                    {
+                        yield return metric;
+                    }
+                }
+            }
+
+            foreach (Metric metric in metrics.Values)
+            {
+                yield return metric;
+            }
+            //metrics.Clear();
         }
     }
 }

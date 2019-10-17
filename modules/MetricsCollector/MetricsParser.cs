@@ -9,47 +9,15 @@ namespace MetricsCollector
     using System.Text;
     using System.Text.RegularExpressions;
 
-    public class MessageFormatter
+    public class MetricsParser
     {
         const string IdentifierPropertyName = "MessageIdentifier";
         const string PrometheusMetricSchema = @"^(?<metricname>[^#\{\}]+)(\{((?<tagname>[^="",]+)=(\""(?<tagvalue>[^="",]+)\"")(,(?<tagname>[^="",]+)=(\""(?<tagvalue>[^="",]+)\""))*)\})?\s(?<metricvalue>.+)$";
         static readonly Regex PrometheusSchemaRegex = new Regex(PrometheusMetricSchema, RegexOptions.Compiled);
-        readonly MetricsFormat format;
-        readonly string identifier;
 
-        public MessageFormatter(MetricsFormat format, string identifier)
+        public IList<Metric> ParseMetrics(DateTime timeGeneratedUtc, string prometheusMessage)
         {
-            this.format = format;
-            this.identifier = identifier;
-        }
-
-        public byte[] BuildJSON(DateTime timeGeneratedUtc, string prometheusMessage)
-        {
-            return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(GetMetricsDataList(timeGeneratedUtc, prometheusMessage)));
-        }
-
-        public IList<Message> Build(DateTime timeGeneratedUtc, string prometheusMessage)
-        {
-            IList<Message> messages = this.format == MetricsFormat.Prometheus
-                ? BuildMessagesInPrometheusFormat(prometheusMessage)
-                : BuildMessagesInJsonFormat(timeGeneratedUtc, prometheusMessage);
-            return messages;
-        }
-
-        IList<Message> BuildMessagesInJsonFormat(DateTime timeGeneratedUtc, string prometheusMessage)
-        {
-            var message = new Message(BuildJSON(timeGeneratedUtc, prometheusMessage));
-            message.Properties[IdentifierPropertyName] = this.identifier;
-            message.MessageSchema = this.format.ToString();
-            message.ContentEncoding = "UTF-8";
-            message.ContentType = "application/json";
-
-            return new List<Message> { message };
-        }
-
-        IList<MetricsData> GetMetricsDataList(DateTime timeGeneratedUtc, string prometheusMessage)
-        {
-            var metricsDataList = new List<MetricsData>();
+            var metricsDataList = new List<Metric>();
             using (StringReader sr = new StringReader(prometheusMessage))
             {
                 string line;
@@ -100,7 +68,7 @@ namespace MetricsCollector
 
                         var tags = tagNames.Zip(tagValues, (k, v) => new { k, v })
                             .ToDictionary(x => x.k, x => x.v);
-                        var metricsData = new MetricsData(
+                        var metricsData = new Metric(
                             timeGeneratedUtc,
                             "prometheus",
                             metricName,
@@ -113,20 +81,17 @@ namespace MetricsCollector
             }
             return metricsDataList;
         }
-
-        IList<Message> BuildMessagesInPrometheusFormat(string prometheusMessage)
-        {
-            byte[] messageBytes = Encoding.UTF8.GetBytes(prometheusMessage);
-            var message = new Message(messageBytes);
-            message.Properties[IdentifierPropertyName] = this.identifier;
-            message.MessageSchema = this.format.ToString();
-            return new[] { message };
-        }
     }
 
-    public class MetricsData
+    public class Metric
     {
-        public MetricsData(DateTime timeGeneratedUtc, string ns, string name, string value, string tags)
+        public DateTime TimeGeneratedUtc { get; }
+        public string Namespace { get; }
+        public string Name { get; }
+        public string Value { get; }
+        public string Tags { get; }
+
+        public Metric(DateTime timeGeneratedUtc, string ns, string name, string value, string tags)
         {
             this.TimeGeneratedUtc = timeGeneratedUtc;
             this.Namespace = ns;
@@ -135,10 +100,9 @@ namespace MetricsCollector
             this.Tags = tags;
         }
 
-        public DateTime TimeGeneratedUtc { get; }
-        public string Namespace { get; }
-        public string Name { get; }
-        public string Value { get; }
-        public string Tags { get; }
+        public int GetValuelessHash()
+        {
+            return HashCode.Combine(Namespace.GetHashCode(), Name.GetHashCode(), Tags.GetHashCode());
+        }
     }
 }
