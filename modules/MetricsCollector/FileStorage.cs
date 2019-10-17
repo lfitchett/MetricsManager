@@ -10,8 +10,20 @@ using System.Threading;
 
 namespace MetricsCollector
 {
-    public class FileStorage
+    public interface IFileStorage
     {
+        void AddScrapeResult(string module, string data);
+        IEnumerable<string> GetAllModules();
+        IDictionary<DateTime, Lazy<string>> GetData(string module);
+        IDictionary<DateTime, Lazy<string>> GetData(string module, DateTime start);
+        IDictionary<DateTime, Lazy<string>> GetData(string module, DateTime start, DateTime end);
+        void RemoveOldEntries(DateTime keepAfter);
+    }
+
+    public class FileStorage : IFileStorage
+    {
+        public static ISystemTime systemTime = SystemTime.Instance;
+
         private string directory;
 
         public FileStorage(string directory)
@@ -22,7 +34,7 @@ namespace MetricsCollector
         public void AddScrapeResult(string module, string data)
         {
             Directory.CreateDirectory(Path.Combine(directory, module));
-            string file = Path.Combine(directory, module, DateTime.UtcNow.Ticks.ToString());
+            string file = Path.Combine(directory, module, systemTime.UtcNow.Ticks.ToString());
             File.WriteAllText(file, data);
         }
 

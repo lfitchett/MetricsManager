@@ -25,16 +25,6 @@ namespace MetricsCollector
         }
 
         /// <summary>
-        ///     Handles cleanup operations when app is cancelled or unloads
-        /// </summary>
-        public static Task WhenCancelled(CancellationToken cancellationToken)
-        {
-            var tcs = new TaskCompletionSource<bool>();
-            cancellationToken.Register(s => ((TaskCompletionSource<bool>)s).SetResult(true), tcs);
-            return tcs.Task;
-        }
-
-        /// <summary>
         ///     Initializes the ModuleClient and sets up the callback to receive
         ///     messages containing temperature information
         /// </summary>
@@ -56,7 +46,7 @@ namespace MetricsCollector
 
             var messageFormatter = new MessageFormatter(configuration.MetricsFormat, identifier);
             var scraper = new Scraper(configuration.Endpoints.Values.ToList());
-            FileStorage storage = new FileStorage(@"\data");
+            var storage = new FileStorage(@"\data");
 
             IMetricsUpload metricsSync;
             if (configuration.SyncTarget == SyncTarget.AzureLogAnalytics)

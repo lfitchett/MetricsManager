@@ -8,15 +8,17 @@ namespace MetricsCollector
 {
     public class Worker
     {
-        private readonly Scraper scraper;
-        private readonly FileStorage storage;
+        public static ISystemTime systemTime = SystemTime.Instance;
+
+        private readonly IScraper scraper;
+        private readonly IFileStorage storage;
         private readonly IMetricsUpload uploader;
         private readonly TimeSpan scrapingInterval;
         private readonly TimeSpan uploadInterval;
 
         private DateTime lastUploadTime = DateTime.MinValue;
 
-        public Worker(Scraper scraper, FileStorage storage, IMetricsUpload uploader, TimeSpan scrapingInterval, TimeSpan uploadInterval)
+        public Worker(IScraper scraper, IFileStorage storage, IMetricsUpload uploader, TimeSpan scrapingInterval, TimeSpan uploadInterval)
         {
             this.scraper = scraper;
             this.storage = storage;
@@ -51,7 +53,7 @@ namespace MetricsCollector
 
                 }
 
-                lastUploadTime = DateTime.Now;
+                lastUploadTime = systemTime.UtcNow;
             }, null, uploadInterval, uploadInterval);
 
 

@@ -9,7 +9,12 @@ namespace MetricsCollector
     using System.Text.RegularExpressions;
     using System.Threading.Tasks;
 
-    public class Scraper
+    public interface IScraper
+    {
+        Task<IDictionary<string, string>> Scrape();
+    }
+
+    public class Scraper : IScraper
     {
         const string UrlPattern = @"[^/:]+://(?<host>[^/:]+)(:[^:]+)?$";
         static readonly Regex UrlRegex = new Regex(UrlPattern, RegexOptions.Compiled);
@@ -55,7 +60,7 @@ namespace MetricsCollector
             return metrics;
         }
 
-        async Task<string> ScrapeEndpoint(string endpoint)
+        private async Task<string> ScrapeEndpoint(string endpoint)
         {
             try
             {
