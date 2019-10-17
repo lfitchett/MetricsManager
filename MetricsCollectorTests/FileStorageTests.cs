@@ -1,4 +1,5 @@
 using MetricsCollector;
+using Moq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,6 +12,15 @@ namespace MetricsCollectorTests
 {
     public class FileStorageTests : TempDirectory
     {
+        private DateTime fakeTime;
+        public FileStorageTests()
+        {
+            var systemTime = new Mock<ISystemTime>();
+            fakeTime = new DateTime(100000000);
+            systemTime.Setup(x => x.UtcNow).Returns(() => fakeTime);
+            FileStorage.systemTime = systemTime.Object;
+        }
+
         [Fact]
         public void Storage()
         {
@@ -58,7 +68,8 @@ namespace MetricsCollectorTests
             Assert.Single(actual);
             Assert.Equal("data1", actual.Single().Value.Value);
 
-            DateTime break1 = DateTime.UtcNow;
+            DateTime break1 = fakeTime.AddMinutes(5);
+            fakeTime = fakeTime.AddMinutes(10);
             storage.AddScrapeResult("test_module", "data2");
 
             actual = storage.GetData("test_module");
@@ -67,7 +78,8 @@ namespace MetricsCollectorTests
             Assert.Single(actual);
             Assert.Equal("data2", actual.Single().Value.Value);
 
-            DateTime break2 = DateTime.UtcNow;
+            DateTime break2 = fakeTime.AddMinutes(5);
+            fakeTime = fakeTime.AddMinutes(10);
             storage.AddScrapeResult("test_module", "data3");
 
             actual = storage.GetData("test_module");
@@ -85,14 +97,18 @@ namespace MetricsCollectorTests
             /* add a variable number of scrape results to 10 different modules */
             Dictionary<string, List<string>> testData = Enumerable.Range(1, 10)
                 .ToDictionary(i => $"module_{i}", i => Enumerable.Range(i, i).Select(j => $"test data {i}-{j}").ToList());
-            testData.ToList().ForEach(d => d.Value.ForEach(data => storage.AddScrapeResult(d.Key, data)));
+            testData.ToList().ForEach(d => d.Value.ForEach(data =>
+            {
+                storage.AddScrapeResult(d.Key, data);
+                fakeTime = fakeTime.AddMinutes(10);
+            }));
 
-            foreach(var d in testData)
+            foreach (var d in testData)
             {
                 /* get all stored data and sort by timestamp (key) */
-                var actual = storage.GetData(d.Key).OrderBy(x => x.Key).Select(x => x.Value.Value);
-                Assert.Equal(d.Value, actual);
-            }            
+                var actual = storage.GetData(d.Key).Select(x => x.Value.Value);
+                Assert.Equal(d.Value.OrderBy(x => x), actual.OrderBy(x => x));
+            }
         }
 
         [Fact]
@@ -106,7 +122,8 @@ namespace MetricsCollectorTests
             Assert.Single(actual);
             Assert.Equal("data1", actual.Single().Value.Value);
 
-            DateTime break1 = DateTime.UtcNow;
+            DateTime break1 = fakeTime.AddMinutes(5);
+            fakeTime = fakeTime.AddMinutes(10);
             storage.AddScrapeResult("test_module", "data2");
 
             actual = storage.GetData("test_module");
@@ -115,10 +132,14 @@ namespace MetricsCollectorTests
             actual = storage.GetData("test_module");
             Assert.Single(actual);
 
-            DateTime break2 = DateTime.UtcNow;
+            DateTime break2 = fakeTime.AddMinutes(5);
+            fakeTime = fakeTime.AddMinutes(10);
             storage.AddScrapeResult("test_module", "data3");
+            fakeTime = fakeTime.AddMinutes(10);
             storage.AddScrapeResult("test_module", "data4");
+            fakeTime = fakeTime.AddMinutes(10);
             storage.AddScrapeResult("test_module", "data5");
+            fakeTime = fakeTime.AddMinutes(10);
 
             actual = storage.GetData("test_module");
             Assert.Equal(4, actual.Count);
