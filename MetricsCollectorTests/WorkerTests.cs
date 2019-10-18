@@ -51,19 +51,21 @@ namespace MetricsCollectorTests
             Assert.Equal(2, scraper.Invocations.Count);
             Assert.Equal(0, storage.Invocations.Count);
 
-            modules[1].value = 5;
+            modules[1].value = 2;
             await Scape();
             Assert.Equal(3, scraper.Invocations.Count);
             Assert.Equal(1, storage.Invocations.Count);
             Assert.Contains("module_2", storedValue);
-            Assert.Contains("5", storedValue);
+            Assert.Contains("1", storedValue);
 
-            modules[5].value = 2.5;
-            modules[2].value = 2;
+            modules[1].value = 3;
+            modules[2].value = 3;
             modules[7].value = 3;
             await Scape();
             Assert.Equal(4, scraper.Invocations.Count);
             Assert.Equal(2, storage.Invocations.Count);
+            Assert.Contains("module_2", storedValue);
+            Assert.Contains("3", storedValue);
 
             await Scape();
             Assert.Equal(5, scraper.Invocations.Count);
@@ -96,7 +98,7 @@ namespace MetricsCollectorTests
             /* test */
             await Upload();
             var _ = uploadedData.ToList();
-            Assert.Equal(1, storage.Invocations.Count);
+            Assert.Single(storage.Invocations.Where(s => s.Method.Name == "GetData"));
             Assert.Equal(1, uploader.Invocations.Count);
         }
 
@@ -128,7 +130,7 @@ namespace MetricsCollectorTests
             /* test */
             await Upload();
             TestUtil.ReflectionEqualCollection(metrics.OrderBy(x => x.Tags), uploadedData.OrderBy(x => x.Tags));
-            Assert.Equal(1, storage.Invocations.Count);
+            Assert.Single(storage.Invocations.Where(s => s.Method.Name == "GetData"));
             Assert.Equal(1, uploader.Invocations.Count);
         }
 
@@ -169,10 +171,9 @@ namespace MetricsCollectorTests
             {
                 Assert.Equal(numMetrics++ / 10 + 1, metricsCalls);
             }
-            Assert.Equal(1, storage.Invocations.Count);
+            Assert.Single(storage.Invocations.Where(s => s.Method.Name == "GetData"));
             Assert.Equal(1, uploader.Invocations.Count);
         }
-
 
         [Fact]
         public async Task ScrapeAndUpload()
@@ -247,6 +248,73 @@ namespace MetricsCollectorTests
             await Upload();
             fakeTime = fakeTime.AddMinutes(1);
             Assert.Empty(uploadedData);
+        }
+
+        [Fact]
+        public async Task NoOverlap()
+        {
+            /* Setup mocks */
+            TaskCompletionSource<bool> scrapeTaskSource = new TaskCompletionSource<bool>();
+            TaskCompletionSource<bool> uploadTaskSource = new TaskCompletionSource<bool>();
+
+            var scraper = new Mock<IScraper>();
+            scraper.Setup(s => s.Scrape()).Returns(async () => {
+                await scrapeTaskSource.Task;
+                return new Dictionary<string, string> { { "edgeAgent", "" } };
+            });
+
+            var storage = new Mock<IFileStorage>();
+
+            var uploader = new Mock<IMetricsUpload>();
+            uploader.Setup(u => u.Upload(It.IsAny<IEnumerable<Metric>>())).Returns(async () => await uploadTaskSource.Task);
+
+            Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
+            MethodInfo methodInfoScrape = typeof(Worker).GetMethod("Scrape", BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo methodInfoUpload = typeof(Worker).GetMethod("Upload", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { };
+            Task Scape()
+            {
+                return methodInfoScrape.Invoke(worker, parameters) as Task;
+            }
+            Task Upload()
+            {
+                return methodInfoUpload.Invoke(worker, parameters) as Task;
+            }
+
+            /* test scraper first */
+            var scrapeTask = Scape();
+            await Task.Delay(1);
+            var uploadTask = Upload();
+            await Task.Delay(1);
+
+            uploadTaskSource.SetResult(true);
+            await Task.Delay(1);
+
+            Assert.False(scrapeTask.IsCompleted);
+            Assert.False(uploadTask.IsCompleted);
+            scrapeTaskSource.SetResult(true);
+            await Task.Delay(1);
+
+            await Task.WhenAll(scrapeTask, uploadTask);
+
+            /* test uploader first */
+            scrapeTaskSource = new TaskCompletionSource<bool>();
+            uploadTaskSource = new TaskCompletionSource<bool>();
+
+            uploadTask = Upload();
+            await Task.Delay(1);
+            scrapeTask = Scape();
+            await Task.Delay(1);
+
+            scrapeTaskSource.SetResult(true);
+            await Task.Delay(1);
+
+            Assert.False(scrapeTask.IsCompleted);
+            Assert.False(uploadTask.IsCompleted);
+            uploadTaskSource.SetResult(true);
+            await Task.Delay(1);
+
+            await Task.WhenAll(scrapeTask, uploadTask);
         }
 
         private string PrometheousMetrics(IEnumerable<(string name, double value)> modules)

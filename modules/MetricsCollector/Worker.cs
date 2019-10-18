@@ -16,6 +16,7 @@ namespace MetricsCollector
         private readonly IMetricsUpload uploader;
         private readonly ISystemTime systemTime;
         private readonly MetricsParser metricsParser = new MetricsParser();
+        private readonly AsyncLock scrapeUploadLock = new AsyncLock();
 
         private DateTime lastUploadTime = DateTime.MinValue;
         private Dictionary<int, Metric> metrics = new Dictionary<int, Metric>();
@@ -41,40 +42,46 @@ namespace MetricsCollector
 
         private async Task Scrape()
         {
-            Console.WriteLine($"\n\n\nScraping Metrics");
-            List<Metric> metricsToPersist = new List<Metric>();
-
-            foreach (var moduleResult in await scraper.Scrape())
+            using (await scrapeUploadLock.GetLock())
             {
-                var scrapedMetrics = metricsParser.ParseMetrics(systemTime.UtcNow, moduleResult.Value);
+                Console.WriteLine($"\n\n\nScraping Metrics");
+                List<Metric> metricsToPersist = new List<Metric>();
 
-                foreach (Metric scrapedMetric in scrapedMetrics)
+                foreach (var moduleResult in await scraper.Scrape())
                 {
-                    if (metrics.TryGetValue(scrapedMetric.GetValuelessHash(), out Metric oldMetric))
+                    var scrapedMetrics = metricsParser.ParseMetrics(systemTime.UtcNow, moduleResult.Value);
+
+                    foreach (Metric scrapedMetric in scrapedMetrics)
                     {
-                        if (oldMetric.Value.Equals(scrapedMetric.Value))
+                        if (metrics.TryGetValue(scrapedMetric.GetValuelessHash(), out Metric oldMetric))
                         {
-                            continue;
+                            if (oldMetric.Value.Equals(scrapedMetric.Value))
+                            {
+                                continue;
+                            }
+                            metricsToPersist.Add(oldMetric);
                         }
-                        metricsToPersist.Add(oldMetric);
+                        metrics[scrapedMetric.GetValuelessHash()] = scrapedMetric;
                     }
-                    metrics[scrapedMetric.GetValuelessHash()] = scrapedMetric;
+
                 }
 
-            }
-
-            if (metricsToPersist.Count != 0)
-            {
-                Console.WriteLine($"Storing metrics");
-                storage.AddScrapeResult(Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
+                if (metricsToPersist.Count != 0)
+                {
+                    Console.WriteLine($"Storing metrics");
+                    storage.AddScrapeResult(Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
+                }
             }
         }
 
         private async Task Upload()
         {
-            Console.WriteLine($"\n\n\nUploading Metrics");
-            await uploader.Upload(GetMetricsToUpload(lastUploadTime));
-            lastUploadTime = systemTime.UtcNow;
+            using (await scrapeUploadLock.GetLock())
+            {
+                Console.WriteLine($"\n\n\nUploading Metrics");
+                await uploader.Upload(GetMetricsToUpload(lastUploadTime));
+                lastUploadTime = systemTime.UtcNow;
+            }
         }
 
         private IEnumerable<Metric> GetMetricsToUpload(DateTime lastUploadTime)
@@ -93,7 +100,34 @@ namespace MetricsCollector
             {
                 yield return metric;
             }
+
+            storage.RemoveOldEntries(lastUploadTime);
             metrics.Clear();
+        }
+    }
+
+    public class AsyncLock
+    {
+        public class OwnedLock : IDisposable
+        {
+            private SemaphoreSlim semaphore;
+            internal OwnedLock(SemaphoreSlim semaphore)
+            {
+                this.semaphore = semaphore;
+            }
+
+            public void Dispose()
+            {
+                semaphore.Release();
+            }
+        }
+
+        private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+
+        public async Task<OwnedLock> GetLock()
+        {
+            await semaphore.WaitAsync();
+            return new OwnedLock(semaphore);
         }
     }
 }

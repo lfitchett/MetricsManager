@@ -28,7 +28,7 @@ namespace MetricsCollector
         ///     Initializes the ModuleClient and sets up the callback to receive
         ///     messages containing temperature information
         /// </summary>
-        private static async Task<Worker> Init(CancellationToken cancellationToken)
+        private static async Task Init(CancellationToken cancellationToken)
         {
             var mqttSetting = new MqttTransportSettings(TransportType.Mqtt_Tcp_Only);
             ITransportSettings[] settings = { mqttSetting };
