@@ -85,16 +85,16 @@ namespace MetricsCollector
 
     public class Metric
     {
-        public DateTime TimeGeneratedUtc { get; }
-        public string Namespace { get; }
-        public string Name { get; }
-        public string Value { get; }
-        public string Tags { get; }
+        public DateTime TimeGeneratedUtc { get; set; }
+        public string Namespace { get; set; }
+        public string Name { get; set; }
+        public string Value { get; set; }
+        public string Tags { get; set; }
 
-        public Metric(DateTime timeGeneratedUtc, string ns, string name, string value, string tags)
+        public Metric(DateTime timeGeneratedUtc, string @namespace, string name, string value, string tags)
         {
             this.TimeGeneratedUtc = timeGeneratedUtc;
-            this.Namespace = ns;
+            this.Namespace = @namespace;
             this.Name = name;
             this.Value = value;
             this.Tags = tags;

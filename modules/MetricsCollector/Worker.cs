@@ -10,21 +10,22 @@ namespace MetricsCollector
 {
     public class Worker
     {
-        public static ISystemTime systemTime = SystemTime.Instance;
 
         private readonly IScraper scraper;
         private readonly IFileStorage storage;
         private readonly IMetricsUpload uploader;
+        private readonly ISystemTime systemTime;
         private readonly MetricsParser metricsParser = new MetricsParser();
 
         private DateTime lastUploadTime = DateTime.MinValue;
         private Dictionary<int, Metric> metrics = new Dictionary<int, Metric>();
 
-        public Worker(IScraper scraper, IFileStorage storage, IMetricsUpload uploader)
+        public Worker(IScraper scraper, IFileStorage storage, IMetricsUpload uploader, ISystemTime systemTime = null)
         {
             this.scraper = scraper;
             this.storage = storage;
             this.uploader = uploader;
+            this.systemTime = systemTime ?? SystemTime.Instance;
         }
 
         public async Task Start(TimeSpan scrapingInterval, TimeSpan uploadInterval, CancellationToken cancellationToken)
@@ -72,11 +73,11 @@ namespace MetricsCollector
         private async Task Upload()
         {
             Console.WriteLine($"\n\n\nUploading Metrics");
-            await uploader.Upload(GetMetricsToUpload());
+            await uploader.Upload(GetMetricsToUpload(lastUploadTime));
             lastUploadTime = systemTime.UtcNow;
         }
 
-        private IEnumerable<Metric> GetMetricsToUpload()
+        private IEnumerable<Metric> GetMetricsToUpload(DateTime lastUploadTime)
         {
             foreach (KeyValuePair<DateTime, Func<string>> data in storage.GetData(lastUploadTime))
             {
@@ -92,7 +93,7 @@ namespace MetricsCollector
             {
                 yield return metric;
             }
-            //metrics.Clear();
+            metrics.Clear();
         }
     }
 }

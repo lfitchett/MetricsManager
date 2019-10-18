@@ -13,19 +13,20 @@ namespace MetricsCollectorTests
     public class FileStorageTests : TempDirectory
     {
         private DateTime fakeTime;
+        private ISystemTime systemTime;
         public FileStorageTests()
         {
             var systemTime = new Mock<ISystemTime>();
             fakeTime = new DateTime(100000000);
             systemTime.Setup(x => x.UtcNow).Returns(() => fakeTime);
-            FileStorage.systemTime = systemTime.Object;
+            this.systemTime = systemTime.Object;
         }
 
         [Fact]
         public void Storage()
         {
             string directory = GetTempDir();
-            FileStorage storage = new FileStorage(directory);
+            FileStorage storage = new FileStorage(directory, systemTime);
 
             storage.AddScrapeResult(string.Join(", ", Enumerable.Range(0, 10)));
 
@@ -35,7 +36,7 @@ namespace MetricsCollectorTests
         [Fact]
         public void GetDataSingleEntry()
         {
-            FileStorage storage = new FileStorage(GetTempDir());
+            FileStorage storage = new FileStorage(GetTempDir(), systemTime);
 
             string testData = string.Join(", ", Enumerable.Range(0, 10));
             storage.AddScrapeResult(testData);
@@ -48,7 +49,7 @@ namespace MetricsCollectorTests
         [Fact]
         public void GetDataByTime()
         {
-            FileStorage storage = new FileStorage(GetTempDir());
+            FileStorage storage = new FileStorage(GetTempDir(), systemTime);
 
             storage.AddScrapeResult("data1");
 
@@ -80,7 +81,7 @@ namespace MetricsCollectorTests
         [Fact]
         public void RemoveOld()
         {
-            FileStorage storage = new FileStorage(GetTempDir());
+            FileStorage storage = new FileStorage(GetTempDir(), systemTime);
 
             storage.AddScrapeResult("data1");
 

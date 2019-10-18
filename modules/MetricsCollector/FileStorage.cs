@@ -21,13 +21,14 @@ namespace MetricsCollector
 
     public class FileStorage : IFileStorage
     {
-        public static ISystemTime systemTime = SystemTime.Instance;
+        private readonly ISystemTime systemTime;
 
         private string directory;
 
-        public FileStorage(string directory)
+        public FileStorage(string directory, ISystemTime systemTime = null)
         {
             this.directory = directory;
+            this.systemTime = systemTime ?? SystemTime.Instance;
         }
 
         public void AddScrapeResult(string data)

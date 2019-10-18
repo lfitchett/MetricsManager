@@ -104,7 +104,7 @@ namespace MetricsCollectorTests
         public async Task UploadContent()
         {
             /* test data */
-            var metrics = Enumerable.Range(1, 1).Select(i => new Metric(DateTime.Now, "1", "2", "3", $"tag_{i}")).ToList();
+            var metrics = Enumerable.Range(1, 10).Select(i => new Metric(DateTime.Now, "test_namespace", "test_metric", "3", $"tag_{i}")).ToList();
 
             /* Setup mocks */
             var scraper = new Mock<IScraper>();
@@ -127,10 +127,7 @@ namespace MetricsCollectorTests
 
             /* test */
             await Upload();
-
-            var expected = metrics.OrderBy(m => m.Tags).First();
-            var actual = uploadedData.OrderBy(m => m.Tags).First();
-            Assert.Equal(metrics.Select(x => x.GetHashCode()).OrderBy(x => x), uploadedData.Select(x => x.GetHashCode()).OrderBy(x => x));
+            TestUtil.ReflectionEqualCollection(metrics.OrderBy(x => x.Tags), uploadedData.OrderBy(x => x.Tags));
             Assert.Equal(1, storage.Invocations.Count);
             Assert.Equal(1, uploader.Invocations.Count);
         }
@@ -168,7 +165,7 @@ namespace MetricsCollectorTests
             /* test */
             await Upload();
             int numMetrics = 0;
-            foreach(Metric metric in uploadedData)
+            foreach (Metric metric in uploadedData)
             {
                 Assert.Equal(numMetrics++ / 10 + 1, metricsCalls);
             }
@@ -177,43 +174,80 @@ namespace MetricsCollectorTests
         }
 
 
-        //    [Fact]
-        //    public async Task TestBoth()
-        //    {
-        //        /* Setup mocks */
-        //        var testModules = Enumerable.Range(1, 10).Select(i => $"module_{i}").ToList();
-        //        var testData = new List<string>();
+        [Fact]
+        public async Task TestBoth()
+        {
+            /* Setup mocks */
+            var systemTime = new Mock<ISystemTime>();
+            DateTime fakeTime = new DateTime(100000000);
+            systemTime.Setup(x => x.UtcNow).Returns(() => fakeTime);
 
-        //        var scraper = new Mock<IScraper>();
-        //        int numScrapes = 0;
-        //        Func<Dictionary<string, string>> getNextData = () =>
-        //        {
-        //            Dictionary<string, string> next = testModules.ToDictionary(m => m, mod => $"module {mod}\ndata {numScrapes}");
-        //            testData.AddRange(next.Values);
-        //            numScrapes++;
+            var scraper = new Mock<IScraper>();
+            string scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", 1.0)));
+            scraper.Setup(s => s.Scrape()).ReturnsAsync(() => new Dictionary<string, string> { { "edgeAgent", scrapeResults } });
 
-        //            return next;
-        //        };
-        //        scraper.Setup(s => s.Scrape()).ReturnsAsync(getNextData);
+            var storage = new FileStorage(GetTempDir(), systemTime.Object);
 
-        //        var storage = new FileStorage(GetTempDir());
+            var uploader = new Mock<IMetricsUpload>();
+            IEnumerable<Metric> uploadedData = Enumerable.Empty<Metric>();
+            uploader.Setup(u => u.Upload(It.IsAny<IEnumerable<Metric>>())).Callback((Action<IEnumerable<Metric>>)(d => uploadedData = d));
 
-        //        var uploader = new Mock<IMetricsUpload>();
-        //        List<string> uploadedData = new List<string>();
-        //        Action<DateTime, string> onCallback = (time, data) => uploadedData.Add(data);
-        //        uploader.Setup(u => u.Upload(It.IsAny<DateTime>(), It.IsAny<string>())).Callback(onCallback);
+            Worker worker = new Worker(scraper.Object, storage, uploader.Object, systemTime.Object);
+            MethodInfo methodInfoScrape = typeof(Worker).GetMethod("Scrape", BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo methodInfoUpload = typeof(Worker).GetMethod("Upload", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { };
+            Task Scape()
+            {
+                return methodInfoScrape.Invoke(worker, parameters) as Task;
+            }
+            Task Upload()
+            {
+                return methodInfoUpload.Invoke(worker, parameters) as Task;
+            }
 
-        //        /* test */
-        //        Worker worker = new Worker(scraper.Object, storage, uploader.Object, BaseDelay, BaseDelay * 3.33);
+            /* test without de-duping */
+            scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", 1.0)));
+            await Scape();
+            fakeTime = fakeTime.AddMinutes(10);
+            scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", 2.0)));
+            await Scape();
+            fakeTime = fakeTime.AddMinutes(1);
+            await Upload();
+            Assert.Equal(20, uploadedData.Count());
+            fakeTime = fakeTime.AddMinutes(1);
+            await Upload();
+            Assert.Empty(uploadedData);
 
-        //        CancellationTokenSource cts = new CancellationTokenSource(BaseDelay * 3.66);
-        //        await worker.Start(cts.Token);
-        //        await Task.Delay(BaseDelay);
+            /* test de-duping */
+            fakeTime = fakeTime.AddMinutes(20);
+            scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", 5.0)));
+            await Scape();
+            fakeTime = fakeTime.AddMinutes(10);
+            await Scape();
+            await Upload();
+            fakeTime = fakeTime.AddMinutes(1);
+            Assert.Equal(10, uploadedData.Count());
+            fakeTime = fakeTime.AddMinutes(1);
+            await Upload();
+            Assert.Empty(uploadedData);
 
-        //        Assert.Equal(3, numScrapes);
-        //        Assert.Equal(testModules.Count * numScrapes, uploadedData.Count);
-        //        Assert.Equal(testData.OrderBy(x => x), uploadedData.OrderBy(x => x));
-        //    }
+            /* test mix of de-duping and not */
+            fakeTime = fakeTime.AddMinutes(20);
+            scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", 7.0)));
+            await Scape();
+            fakeTime = fakeTime.AddMinutes(10);
+            scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", i % 2 == 0 ? 7.0 : 8.0)));
+            await Scape();
+            fakeTime = fakeTime.AddMinutes(10);
+            scrapeResults = PrometheousMetrics(Enumerable.Range(1, 10).Select(i => ($"module_{i}", 7.0)));
+            await Scape();
+            fakeTime = fakeTime.AddMinutes(1);
+            await Upload();
+            Assert.Equal(20, uploadedData.Count());
+            await Upload();
+            fakeTime = fakeTime.AddMinutes(1);
+            Assert.Empty(uploadedData);
+        }
 
         private string PrometheousMetrics(IEnumerable<(string name, double value)> modules)
         {
