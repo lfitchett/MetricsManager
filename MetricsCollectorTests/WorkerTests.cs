@@ -70,43 +70,112 @@ namespace MetricsCollectorTests
             Assert.Equal(2, storage.Invocations.Count);
         }
 
-        //[Fact]
-        //public async Task TestUploading()
-        //{
-        //    /* Setup mocks */
-        //    var testModules = Enumerable.Range(1, 10).Select(i => $"module_{i}").ToList();
-        //    var testData = testModules.ToDictionary(m => m, mod => Enumerable.Range(1, 10).ToDictionary(i => new DateTime(i * 1000000), i => new Lazy<string>($"module {mod}\ndata {i}")));
+        [Fact]
+        public async Task BasicUploading()
+        {
+            /* Setup mocks */
+            var scraper = new Mock<IScraper>();
 
-        //    var scraper = new Mock<IScraper>();
+            var storage = new Mock<IFileStorage>();
+            storage.Setup(s => s.GetData(It.IsAny<DateTime>())).Returns(new Dictionary<DateTime, Func<string>> {
+                { DateTime.UtcNow, () => "" }
+            });
 
-        //    var storage = new Mock<IFileStorage>();
-        //    storage.Setup(s => s.GetAllModules()).Returns(testModules);
-        //    Func<string, DateTime, Dictionary<DateTime, Lazy<string>>> storeFunc = (mod, _) => testData[mod];
-        //    storage.Setup(s => s.GetData(It.IsIn<string>(testModules), It.IsAny<DateTime>())).Returns(storeFunc);
+            var uploader = new Mock<IMetricsUpload>();
+            IEnumerable<Metric> uploadedData = Enumerable.Empty<Metric>();
+            uploader.Setup(u => u.Upload(It.IsAny<IEnumerable<Metric>>())).Callback((Action<IEnumerable<Metric>>)(data => uploadedData = data));
 
-        //    var uploader = new Mock<IMetricsUpload>();
-        //    HashSet<KeyValuePair<DateTime, string>> uploadedData = new HashSet<KeyValuePair<DateTime, string>>();
-        //    Action<DateTime, string> onCallback = (time, data) => uploadedData.Add(new KeyValuePair<DateTime, string>(time, data));
-        //    uploader.Setup(u => u.Upload(It.IsAny<DateTime>(), It.IsAny<string>())).Callback(onCallback);
+            Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
+            MethodInfo methodInfo = typeof(Worker).GetMethod("Upload", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { };
+            Task Upload()
+            {
+                return methodInfo.Invoke(worker, parameters) as Task;
+            }
 
-        //    Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
-        //    MethodInfo methodInfo = typeof(Worker).GetMethod("Scrape", BindingFlags.NonPublic | BindingFlags.Instance);
-        //    object[] parameters = { };
-        //    Task Scape()
-        //    {
-        //        return methodInfo.Invoke(worker, parameters) as Task;
-        //    }
+            /* test */
+            await Upload();
+            var _ = uploadedData.ToList();
+            Assert.Equal(1, storage.Invocations.Count);
+            Assert.Equal(1, uploader.Invocations.Count);
+        }
 
-        //    /* test */
-        //    CancellationTokenSource cts = new CancellationTokenSource(BaseDelay * 1.5);
-        //    await worker.Start(TimeSpan.FromDays(1), BaseDelay, cts.Token);
+        [Fact]
+        public async Task UploadContent()
+        {
+            /* test data */
+            var metrics = Enumerable.Range(1, 1).Select(i => new Metric(DateTime.Now, "1", "2", "3", $"tag_{i}")).ToList();
 
-        //    foreach (var data in testData.SelectMany(d => d.Value).Select(d => new KeyValuePair<DateTime, string>(d.Key, d.Value.Value)))
-        //    {
-        //        Assert.True(uploadedData.Remove(data));
-        //    }
-        //    Assert.Empty(uploadedData);
-        //}
+            /* Setup mocks */
+            var scraper = new Mock<IScraper>();
+
+            var storage = new Mock<IFileStorage>();
+            storage.Setup(s => s.GetData(It.IsAny<DateTime>())).Returns(new Dictionary<DateTime, Func<string>> {
+                { DateTime.UtcNow, () => Newtonsoft.Json.JsonConvert.SerializeObject(metrics) }
+            });
+            var uploader = new Mock<IMetricsUpload>();
+            IEnumerable<Metric> uploadedData = Enumerable.Empty<Metric>();
+            uploader.Setup(u => u.Upload(It.IsAny<IEnumerable<Metric>>())).Callback((Action<IEnumerable<Metric>>)(d => uploadedData = d));
+
+            Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
+            MethodInfo methodInfo = typeof(Worker).GetMethod("Upload", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { };
+            Task Upload()
+            {
+                return methodInfo.Invoke(worker, parameters) as Task;
+            }
+
+            /* test */
+            await Upload();
+
+            var expected = metrics.OrderBy(m => m.Tags).First();
+            var actual = uploadedData.OrderBy(m => m.Tags).First();
+            Assert.Equal(metrics.Select(x => x.GetHashCode()).OrderBy(x => x), uploadedData.Select(x => x.GetHashCode()).OrderBy(x => x));
+            Assert.Equal(1, storage.Invocations.Count);
+            Assert.Equal(1, uploader.Invocations.Count);
+        }
+
+        [Fact]
+        public async Task UploadIsLazy()
+        {
+            /* test data */
+            int metricsCalls = 0;
+            string Metrics()
+            {
+                metricsCalls++;
+                return Newtonsoft.Json.JsonConvert.SerializeObject(Enumerable.Range(1, 10).Select(i => new Metric(DateTime.Now, "1", "2", "3", $"{i}")));
+            }
+            Dictionary<DateTime, Func<string>> data = Enumerable.Range(1, 10).ToDictionary(i => new DateTime(i * 100000000), _ => (Func<string>)Metrics);
+
+            /* Setup mocks */
+            var scraper = new Mock<IScraper>();
+
+            var storage = new Mock<IFileStorage>();
+            storage.Setup(s => s.GetData(It.IsAny<DateTime>())).Returns(data);
+
+            var uploader = new Mock<IMetricsUpload>();
+            IEnumerable<Metric> uploadedData = Enumerable.Empty<Metric>();
+            uploader.Setup(u => u.Upload(It.IsAny<IEnumerable<Metric>>())).Callback((Action<IEnumerable<Metric>>)(d => uploadedData = d));
+
+            Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
+            MethodInfo methodInfo = typeof(Worker).GetMethod("Upload", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { };
+            Task Upload()
+            {
+                return methodInfo.Invoke(worker, parameters) as Task;
+            }
+
+            /* test */
+            await Upload();
+            int numMetrics = 0;
+            foreach(Metric metric in uploadedData)
+            {
+                Assert.Equal(numMetrics++ / 10 + 1, metricsCalls);
+            }
+            Assert.Equal(1, storage.Invocations.Count);
+            Assert.Equal(1, uploader.Invocations.Count);
+        }
+
 
         //    [Fact]
         //    public async Task TestBoth()

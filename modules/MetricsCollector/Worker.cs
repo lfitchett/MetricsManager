@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -79,7 +80,8 @@ namespace MetricsCollector
         {
             foreach (KeyValuePair<DateTime, Func<string>> data in storage.GetData(lastUploadTime))
             {
-                var fileMetrics = Newtonsoft.Json.JsonConvert.DeserializeObject<Metric[]>(data.Value());
+                var temp = data.Value();
+                var fileMetrics = Newtonsoft.Json.JsonConvert.DeserializeObject<Metric[]>(temp) ?? Enumerable.Empty<Metric>();
                 foreach (Metric metric in fileMetrics)
                 {
                     yield return metric;

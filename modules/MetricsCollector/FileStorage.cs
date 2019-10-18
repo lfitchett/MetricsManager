@@ -64,7 +64,7 @@ namespace MetricsCollector
                         {
                             return File.ReadAllText(file);
                         }
-                        return "[]";
+                        return "";
                     })
                 );
         }
