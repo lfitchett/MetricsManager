@@ -12,11 +12,10 @@ namespace MetricsCollector
 {
     public interface IFileStorage
     {
-        void AddScrapeResult(string module, string data);
-        IEnumerable<string> GetAllModules();
-        IDictionary<DateTime, Func<string>> GetData(string module);
-        IDictionary<DateTime, Func<string>> GetData(string module, DateTime start);
-        IDictionary<DateTime, Func<string>> GetData(string module, DateTime start, DateTime end);
+        void AddScrapeResult(string data);
+        IDictionary<DateTime, Func<string>> GetData();
+        IDictionary<DateTime, Func<string>> GetData(DateTime start);
+        IDictionary<DateTime, Func<string>> GetData(DateTime start, DateTime end);
         void RemoveOldEntries(DateTime keepAfter);
     }
 
@@ -31,33 +30,28 @@ namespace MetricsCollector
             this.directory = directory;
         }
 
-        public void AddScrapeResult(string module, string data)
+        public void AddScrapeResult(string data)
         {
-            Directory.CreateDirectory(Path.Combine(directory, module));
-            string file = Path.Combine(directory, module, systemTime.UtcNow.Ticks.ToString());
+            Directory.CreateDirectory(directory);
+            string file = Path.Combine(directory, systemTime.UtcNow.Ticks.ToString());
             File.WriteAllText(file, data);
         }
 
-        public IEnumerable<string> GetAllModules()
+        public IDictionary<DateTime, Func<string>> GetData()
         {
-            return Directory.GetDirectories(directory).Select(Path.GetFileName);
+            return GetData(_ => true);
         }
-
-        public IDictionary<DateTime, Func<string>> GetData(string module)
+        public IDictionary<DateTime, Func<string>> GetData(DateTime start)
         {
-            return GetData(module, _ => true);
+            return GetData(ticks => start.Ticks <= ticks);
         }
-        public IDictionary<DateTime, Func<string>> GetData(string module, DateTime start)
+        public IDictionary<DateTime, Func<string>> GetData(DateTime start, DateTime end)
         {
-            return GetData(module, ticks => start.Ticks <= ticks);
+            return GetData(ticks => start.Ticks <= ticks && ticks <= end.Ticks);
         }
-        public IDictionary<DateTime, Func<string>> GetData(string module, DateTime start, DateTime end)
+        private IDictionary<DateTime, Func<string>> GetData(Func<long, bool> inTimeRange)
         {
-            return GetData(module, ticks => start.Ticks <= ticks && ticks <= end.Ticks);
-        }
-        private IDictionary<DateTime, Func<string>> GetData(string module, Func<long, bool> inTimeRange)
-        {
-            return Directory.GetFiles(Path.Combine(directory, module))
+            return Directory.GetFiles(directory)
                 .Select(Path.GetFileName)
                 .SelectWhere(fileName => (long.TryParse(fileName, out long timestamp), timestamp))
                 .Where(inTimeRange)
@@ -65,7 +59,7 @@ namespace MetricsCollector
                     ticks => new DateTime(ticks),
                     ticks => (Func<string>)(() =>
                     {
-                        string file = Path.Combine(directory, module, ticks.ToString());
+                        string file = Path.Combine(directory, ticks.ToString());
                         if (File.Exists(file))
                         {
                             return File.ReadAllText(file);
@@ -77,14 +71,12 @@ namespace MetricsCollector
 
         public void RemoveOldEntries(DateTime keepAfter)
         {
-            GetAllModules()
-                .SelectMany(module =>
-                    GetData(module)
-                    .Select(d => d.Key)
-                    .Where(timestamp => timestamp < keepAfter)
-                    .Select(timestamp => Path.Combine(directory, module, timestamp.Ticks.ToString()))
-                ).ToList()
-                .ForEach(File.Delete);
+            GetData()
+            .Select(d => d.Key)
+            .Where(timestamp => timestamp < keepAfter)
+            .Select(timestamp => Path.Combine(directory, timestamp.Ticks.ToString()))
+            .ToList()
+            .ForEach(File.Delete);
         }
     }
     public static class SelectWhereClass

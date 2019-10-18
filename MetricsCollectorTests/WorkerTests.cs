@@ -30,7 +30,7 @@ namespace MetricsCollectorTests
 
             var storage = new Mock<IFileStorage>();
             string storedValue = "";
-            storage.Setup(s => s.AddScrapeResult("edgeAgent", It.IsAny<string>())).Callback((Action<string, string>)((_, data) => storedValue = data));
+            storage.Setup(s => s.AddScrapeResult(It.IsAny<string>())).Callback((Action<string>)(data => storedValue = data));
 
             var uploader = new Mock<IMetricsUpload>();
 
@@ -70,37 +70,43 @@ namespace MetricsCollectorTests
             Assert.Equal(2, storage.Invocations.Count);
         }
 
-        //    [Fact]
-        //    public async Task TestUploading()
+        //[Fact]
+        //public async Task TestUploading()
+        //{
+        //    /* Setup mocks */
+        //    var testModules = Enumerable.Range(1, 10).Select(i => $"module_{i}").ToList();
+        //    var testData = testModules.ToDictionary(m => m, mod => Enumerable.Range(1, 10).ToDictionary(i => new DateTime(i * 1000000), i => new Lazy<string>($"module {mod}\ndata {i}")));
+
+        //    var scraper = new Mock<IScraper>();
+
+        //    var storage = new Mock<IFileStorage>();
+        //    storage.Setup(s => s.GetAllModules()).Returns(testModules);
+        //    Func<string, DateTime, Dictionary<DateTime, Lazy<string>>> storeFunc = (mod, _) => testData[mod];
+        //    storage.Setup(s => s.GetData(It.IsIn<string>(testModules), It.IsAny<DateTime>())).Returns(storeFunc);
+
+        //    var uploader = new Mock<IMetricsUpload>();
+        //    HashSet<KeyValuePair<DateTime, string>> uploadedData = new HashSet<KeyValuePair<DateTime, string>>();
+        //    Action<DateTime, string> onCallback = (time, data) => uploadedData.Add(new KeyValuePair<DateTime, string>(time, data));
+        //    uploader.Setup(u => u.Upload(It.IsAny<DateTime>(), It.IsAny<string>())).Callback(onCallback);
+
+        //    Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
+        //    MethodInfo methodInfo = typeof(Worker).GetMethod("Scrape", BindingFlags.NonPublic | BindingFlags.Instance);
+        //    object[] parameters = { };
+        //    Task Scape()
         //    {
-        //        /* Setup mocks */
-        //        var testModules = Enumerable.Range(1, 10).Select(i => $"module_{i}").ToList();
-        //        var testData = testModules.ToDictionary(m => m, mod => Enumerable.Range(1, 10).ToDictionary(i => new DateTime(i*1000000), i => new Lazy<string>($"module {mod}\ndata {i}")));
-
-        //        var scraper = new Mock<IScraper>();
-
-        //        var storage = new Mock<IFileStorage>();
-        //        storage.Setup(s => s.GetAllModules()).Returns(testModules);
-        //        Func<string, DateTime, Dictionary<DateTime, Lazy<string>>> storeFunc = (mod, _) => testData[mod];
-        //        storage.Setup(s => s.GetData(It.IsIn<string>(testModules), It.IsAny<DateTime>())).Returns(storeFunc);
-
-        //        var uploader = new Mock<IMetricsUpload>();
-        //        HashSet<KeyValuePair<DateTime, string>> uploadedData = new HashSet<KeyValuePair<DateTime, string>>();
-        //        Action<DateTime, string> onCallback = (time, data) => uploadedData.Add(new KeyValuePair<DateTime, string>(time, data));
-        //        uploader.Setup(u => u.Upload(It.IsAny<DateTime>(), It.IsAny<string>())).Callback(onCallback);
-
-        //        /* test */
-        //        Worker worker = new Worker(scraper.Object, storage.Object, uploader.Object);
-
-        //        CancellationTokenSource cts = new CancellationTokenSource(BaseDelay * 1.5); 
-        //        await worker.Start(TimeSpan.FromDays(1), BaseDelay, cts.Token);
-
-        //        foreach (var data in testData.SelectMany(d => d.Value).Select(d => new KeyValuePair<DateTime, string>(d.Key, d.Value.Value)))
-        //        {
-        //            Assert.True(uploadedData.Remove(data));
-        //        }
-        //        Assert.Empty(uploadedData);
+        //        return methodInfo.Invoke(worker, parameters) as Task;
         //    }
+
+        //    /* test */
+        //    CancellationTokenSource cts = new CancellationTokenSource(BaseDelay * 1.5);
+        //    await worker.Start(TimeSpan.FromDays(1), BaseDelay, cts.Token);
+
+        //    foreach (var data in testData.SelectMany(d => d.Value).Select(d => new KeyValuePair<DateTime, string>(d.Key, d.Value.Value)))
+        //    {
+        //        Assert.True(uploadedData.Remove(data));
+        //    }
+        //    Assert.Empty(uploadedData);
+        //}
 
         //    [Fact]
         //    public async Task TestBoth()

@@ -40,12 +40,12 @@ namespace MetricsCollector
         private async Task Scrape()
         {
             Console.WriteLine($"\n\n\nScraping Metrics");
+            List<Metric> metricsToPersist = new List<Metric>();
 
             foreach (var moduleResult in await scraper.Scrape())
             {
                 var scrapedMetrics = metricsParser.ParseMetrics(systemTime.UtcNow, moduleResult.Value);
 
-                List<Metric> metricsToPersist = new List<Metric>();
                 foreach (Metric scrapedMetric in scrapedMetrics)
                 {
                     if (metrics.TryGetValue(scrapedMetric.GetValuelessHash(), out Metric oldMetric))
@@ -59,11 +59,12 @@ namespace MetricsCollector
                     metrics[scrapedMetric.GetValuelessHash()] = scrapedMetric;
                 }
 
-                if (metricsToPersist.Count != 0)
-                {
-                    Console.WriteLine($"Storing metrics for {moduleResult.Key}:\n{moduleResult.Value}");
-                    storage.AddScrapeResult(moduleResult.Key, Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
-                }
+            }
+
+            if (metricsToPersist.Count != 0)
+            {
+                Console.WriteLine($"Storing metrics");
+                storage.AddScrapeResult(Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
             }
         }
 
@@ -76,15 +77,12 @@ namespace MetricsCollector
 
         private IEnumerable<Metric> GetMetricsToUpload()
         {
-            foreach (string module in storage.GetAllModules())
+            foreach (KeyValuePair<DateTime, Func<string>> data in storage.GetData(lastUploadTime))
             {
-                foreach (KeyValuePair<DateTime, Func<string>> data in storage.GetData(module, lastUploadTime))
+                var fileMetrics = Newtonsoft.Json.JsonConvert.DeserializeObject<Metric[]>(data.Value());
+                foreach (Metric metric in fileMetrics)
                 {
-                    var fileMetrics = Newtonsoft.Json.JsonConvert.DeserializeObject<Metric[]>(data.Value());
-                    foreach (Metric metric in fileMetrics)
-                    {
-                        yield return metric;
-                    }
+                    yield return metric;
                 }
             }
 
