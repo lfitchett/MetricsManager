@@ -43,7 +43,6 @@ namespace MetricsCollector
 
             foreach (var moduleResult in await scraper.Scrape())
             {
-                Console.WriteLine($"Storing metrics for {moduleResult.Key}:\n{moduleResult.Value}");
                 var scrapedMetrics = metricsParser.ParseMetrics(systemTime.UtcNow, moduleResult.Value);
 
                 List<Metric> metricsToPersist = new List<Metric>();
@@ -57,10 +56,14 @@ namespace MetricsCollector
                         }
                         metricsToPersist.Add(oldMetric);
                     }
-                    metrics.Add(scrapedMetric.GetValuelessHash(), scrapedMetric);
+                    metrics[scrapedMetric.GetValuelessHash()] = scrapedMetric;
                 }
 
-                storage.AddScrapeResult(moduleResult.Key, Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
+                if (metricsToPersist.Count != 0)
+                {
+                    Console.WriteLine($"Storing metrics for {moduleResult.Key}:\n{moduleResult.Value}");
+                    storage.AddScrapeResult(moduleResult.Key, Newtonsoft.Json.JsonConvert.SerializeObject(metricsToPersist));
+                }
             }
         }
 
