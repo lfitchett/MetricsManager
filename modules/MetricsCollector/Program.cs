@@ -21,14 +21,14 @@ namespace MetricsCollector
             AssemblyLoadContext.Default.Unloading += ctx => cts.Cancel();
             Console.CancelKeyPress += (sender, cpe) => cts.Cancel();
 
-            //Init().ContinueWith(async worker => (await worker).Start(cts.Token)).Wait();
+            Init(cts.Token).Wait();
         }
 
         /// <summary>
         ///     Initializes the ModuleClient and sets up the callback to receive
         ///     messages containing temperature information
         /// </summary>
-        private static async Task<Worker> Init()
+        private static async Task<Worker> Init(CancellationToken cancellationToken)
         {
             var mqttSetting = new MqttTransportSettings(TransportType.Mqtt_Tcp_Only);
             ITransportSettings[] settings = { mqttSetting };
@@ -70,11 +70,14 @@ namespace MetricsCollector
                 metricsSync = new IoTHubMetricsUpload(messageFormatter, scraper, ioTHubModuleClient);
             }
 
+            // for testing
+            metricsSync = new StdoutUploader();
 
             var scrapingInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs);
             var uploadInterval = TimeSpan.FromSeconds(configuration.ScrapeFrequencySecs * 2);
 
-            return new Worker(scraper, storage, metricsSync);
+            var worker = new Worker(scraper, storage, metricsSync);
+            await worker.Start(scrapingInterval, uploadInterval, cancellationToken);
         }
 
         private static async Task<Configuration> GetConfiguration(ModuleClient ioTHubModuleClient)

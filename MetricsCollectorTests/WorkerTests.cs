@@ -175,7 +175,7 @@ namespace MetricsCollectorTests
 
 
         [Fact]
-        public async Task TestBoth()
+        public async Task ScrapeAndUpload()
         {
             /* Setup mocks */
             var systemTime = new Mock<ISystemTime>();
