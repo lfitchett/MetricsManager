@@ -6,21 +6,18 @@ namespace MetricsCollector
 
     public class Configuration
     {
-        //[JsonConstructor]
-        //public Configuration(
-        //    string schemaVersion,
-        //    IDictionary<string, string> endpoints, 
-        //    int scrapeFrequencySecs, 
-        //    MetricsFormat metricsFormat, 
-        //    SyncTarget syncTarget)
-        //{
-        //    SchemaVersion = schemaVersion;
-        //    Endpoints = endpoints;
-        //    ScrapeFrequencySecs = scrapeFrequencySecs;
-        //    MetricsFormat = metricsFormat;
-        //    SyncTarget = syncTarget;
-        //}
-
+        [JsonConstructor]
+        public Configuration(string schemaVersion, IDictionary<string, string> endpoints, int scrapeFrequencySecs, int uploadFrequencySecs, string storageLoaction, MetricsFormat metricsFormat, SyncTarget syncTarget)
+        {
+            SchemaVersion = schemaVersion;
+            Endpoints = endpoints;
+            ScrapeFrequencySecs = scrapeFrequencySecs;
+            UploadFrequencySecs = uploadFrequencySecs;
+            StorageLoaction = storageLoaction;
+            MetricsFormat = metricsFormat;
+            SyncTarget = syncTarget;
+        }
+        
         public string SchemaVersion { get; }
 
         public IDictionary<string, string> Endpoints { get; }

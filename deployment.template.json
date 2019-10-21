@@ -22,7 +22,7 @@
           "edgeAgent": {
             "type": "docker",
             "settings": {
-              "image": "lefitchereg1.azurecr.io/edge_agent_test:0.0.20-amd64",
+              "image": "lefitchereg1.azurecr.io/edge_agent_test:0.0.21-amd64",
               "createOptions": {
                 "ExposedPorts": {
                   "9600/tcp": {}

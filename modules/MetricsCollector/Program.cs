@@ -46,7 +46,7 @@ namespace MetricsCollector
 
             var messageFormatter = new MetricsParser();
             var scraper = new Scraper(configuration.Endpoints.Values.ToList());
-            var storage = new FileStorage(configuration.StorageLoaction);
+            var storage = new FileStorage(configuration.StorageLoaction ?? "data");
 
             IMetricsUpload metricsSync = null;
             switch (configuration.SyncTarget)
