@@ -10,7 +10,6 @@ namespace MetricsCollector
 {
     public class Worker
     {
-
         private readonly IScraper scraper;
         private readonly IFileStorage storage;
         private readonly IMetricsUpload uploader;

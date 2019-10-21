@@ -54,7 +54,7 @@ namespace MetricsCollector
             {
                 Console.WriteLine($"Scraping endpoint {endpoint.Key}");
                 string metricsData = await this.ScrapeEndpoint(endpoint.Value);
-                Console.WriteLine($"Got metrics from endpoint {endpoint}");
+                Console.WriteLine($"Got metrics from endpoint {endpoint}:\n{metricsData}");
                 metrics.Add(endpoint.Key, metricsData);
             }
             return metrics;

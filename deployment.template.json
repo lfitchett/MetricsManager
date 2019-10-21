@@ -22,7 +22,7 @@
           "edgeAgent": {
             "type": "docker",
             "settings": {
-              "image": "lefitchereg1.azurecr.io/edge_agent_test:0.0.18-amd64",
+              "image": "lefitchereg1.azurecr.io/edge_agent_test:0.0.20-amd64",
               "createOptions": {
                 "ExposedPorts": {
                   "9600/tcp": {}
@@ -65,7 +65,7 @@
               "createOptions": {
                 "HostConfig": {
                   "Binds": [
-                    "/shared/metrics:/data"
+                    "/shared/metrics:/app/data"
                   ]
                 }
               }
@@ -118,8 +118,10 @@
       "properties.desired": {
         "schemaVersion": "1.0",
         "scrapeFrequencySecs": 10,
+        "uploadFrequencySecs": 30,
+        "storageLocation": "/app/data",
         "metricsFormat": "Json",
-        "syncTarget": "AzureLogAnalytics",
+        "syncTarget": "Console",
         "endpoints": {
           "edgeHub": "http://edgeHub:9600/metrics",
           "edgeAgent": "http://edgeAgent:9600/metrics"

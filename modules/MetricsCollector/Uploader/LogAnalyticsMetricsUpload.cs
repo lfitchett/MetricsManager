@@ -8,14 +8,10 @@
 
     class LogAnalyticsMetricsUpload : IMetricsUpload
     {
-        readonly MetricsParser messageFormatter;
-        readonly Scraper scraper;
         readonly AzureLogAnalytics logAnalytics;
 
-        public LogAnalyticsMetricsUpload(MetricsParser messageFormatter, Scraper scraper, AzureLogAnalytics logAnalytics)
+        public LogAnalyticsMetricsUpload(AzureLogAnalytics logAnalytics)
         {
-            this.messageFormatter = messageFormatter ?? throw new ArgumentNullException(nameof(messageFormatter));
-            this.scraper = scraper ?? throw new ArgumentNullException(nameof(scraper));
             this.logAnalytics = logAnalytics;
         }
 
