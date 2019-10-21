@@ -1,0 +1,15 @@
+@startuml
+
+cloud IoTHub
+node device {
+    artifact diagnostics 
+    artifact edgeAgent
+    artifact edgeHub
+
+    diagnostics <-- edgeAgent
+    diagnostics <-- edgeHub
+    device -- diagnostics
+}
+IoTHub <-- device
+
+@enduml

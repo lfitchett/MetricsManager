@@ -22,15 +22,18 @@
           "edgeAgent": {
             "type": "docker",
             "settings": {
-              "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
-              "createOptions": {}
+              "image": "lefitchereg1.azurecr.io/edge_agent_test:0.0.21-amd64",
+              "createOptions": {
+                "ExposedPorts": {
+                  "9600/tcp": {}
+                }
+              }
             }
           },
           "edgeHub": {
             "settings": {
               "image": "mcr.microsoft.com/azureiotedge-hub:1.0.9-rc2",
               "createOptions": {
-                "User": "ContainerAdministrator",
                 "ExposedPorts": {
                   "9600/tcp": {},
                   "5671/tcp": {},
@@ -59,7 +62,13 @@
             "restartPolicy": "always",
             "settings": {
               "image": "${MODULES.MetricsCollector}",
-              "createOptions": {}
+              "createOptions": {
+                "HostConfig": {
+                  "Binds": [
+                    "/shared/metrics:/app/data"
+                  ]
+                }
+              }
             },
             "env": {
               "AzMonWorkspaceId": {
@@ -77,6 +86,16 @@
             "restartPolicy": "always",
             "settings": {
               "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0",
+              "createOptions": {}
+            }
+          },
+          "Crasher": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "lefitchereg1.azurecr.io/crasher:0.0.11-amd64",
               "createOptions": {}
             }
           }
@@ -98,11 +117,14 @@
     "MetricsCollector": {
       "properties.desired": {
         "schemaVersion": "1.0",
-        "scrapeFrequencySecs": 300,
+        "scrapeFrequencySecs": 10,
+        "uploadFrequencySecs": 30,
+        "storageLocation": "/app/data",
         "metricsFormat": "Json",
-        "syncTarget": "AzureLogAnalytics",
+        "syncTarget": "Console",
         "endpoints": {
-          "edgeHub": "http://edgeHub:9600/metrics"
+          "edgeHub": "http://edgeHub:9600/metrics",
+          "edgeAgent": "http://edgeAgent:9600/metrics"
         }
       }
     }

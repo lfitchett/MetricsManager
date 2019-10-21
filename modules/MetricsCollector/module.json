@@ -4,7 +4,7 @@
     "image": {
         "repository": "$CONTAINER_REGISTRY/metricscollector",
         "tag": {
-            "version": "0.0.2",
+            "version": "0.0.12",
             "platforms": {
                 "amd64": "./Dockerfile.amd64",
                 "amd64.debug": "./Dockerfile.amd64.debug",

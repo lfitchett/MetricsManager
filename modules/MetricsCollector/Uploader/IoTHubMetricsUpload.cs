@@ -1,0 +1,36 @@
+﻿namespace MetricsCollector
+{
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading.Tasks;
+    using Microsoft.Azure.Devices.Client;
+
+    public class IoTHubMetricsUpload : IMetricsUpload
+    {
+        readonly MetricsParser messageFormatter;
+        readonly Scraper scraper;
+        readonly ModuleClient moduleClient;
+
+        public IoTHubMetricsUpload(MetricsParser messageFormatter, Scraper scraper, ModuleClient moduleClient)
+        {
+            this.messageFormatter = messageFormatter ?? throw new ArgumentNullException(nameof(messageFormatter));
+            this.scraper = scraper ?? throw new ArgumentNullException(nameof(scraper));
+            this.moduleClient = moduleClient;
+        }
+
+        public async Task Upload(IEnumerable<Metric> metrics)
+        {
+            await Task.CompletedTask;
+            //try
+            //{
+            //    IList<Message> messages = messageFormatter.Build(scrapedTime, prometheusMetrics);
+            //    await moduleClient.SendEventBatchAsync(messages);
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine($"Error uploading metrics - {e}");
+            //}
+        }
+    }
+}

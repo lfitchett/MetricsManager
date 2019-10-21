@@ -1,6 +1,7 @@
 namespace MetricsCollector
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
     using System.Net;
@@ -8,7 +9,12 @@ namespace MetricsCollector
     using System.Text.RegularExpressions;
     using System.Threading.Tasks;
 
-    public class Scraper
+    public interface IScraper
+    {
+        Task<IDictionary<string, string>> Scrape();
+    }
+
+    public class Scraper : IScraper
     {
         const string UrlPattern = @"[^/:]+://(?<host>[^/:]+)(:[^:]+)?$";
         static readonly Regex UrlRegex = new Regex(UrlPattern, RegexOptions.Compiled);
@@ -41,20 +47,20 @@ namespace MetricsCollector
             return endpointWithIp;
         }
 
-        public async Task<IEnumerable<string>> Scrape()
+        public async Task<IDictionary<string, string>> Scrape()
         {
-            var metrics = new List<string>();
+            var metrics = new Dictionary<string, string>();
             foreach (KeyValuePair<string, string> endpoint in this.endpoints)
             {
                 Console.WriteLine($"Scraping endpoint {endpoint.Key}");
                 string metricsData = await this.ScrapeEndpoint(endpoint.Value);
-                Console.WriteLine($"Got metrics from endpoint {endpoint}");
-                metrics.Add(metricsData);
+                Console.WriteLine($"Got metrics from endpoint {endpoint}:\n{metricsData}");
+                metrics.Add(endpoint.Key, metricsData);
             }
             return metrics;
         }
 
-        async Task<string> ScrapeEndpoint(string endpoint)
+        private async Task<string> ScrapeEndpoint(string endpoint)
         {
             try
             {
